@@ -1,5 +1,4 @@
 using System.Buffers.Binary;
-using System.Net;
 using System.Net.Sockets;
 
 namespace DrawingServer;
@@ -8,22 +7,17 @@ namespace DrawingServer;
 /// Receives Pencil / gesture / hotkey events from the iPad on its own TCP socket, so input is
 /// never stuck behind a large video frame, and replays them with <see cref="InputInjector"/>.
 /// </summary>
-public sealed class InputServer(ServerOptions options, InputInjector injector)
+public sealed class InputServer(ConnectionSource source, InputInjector injector)
 {
     public async Task RunAsync(CancellationToken ct)
     {
-        var listener = new TcpListener(IPAddress.Any, options.InputPort);
-        listener.Start();
-        Console.WriteLine($"Input: listening on TCP {options.InputPort}");
-
         while (!ct.IsCancellationRequested)
         {
-            using TcpClient client = await listener.AcceptTcpClientAsync(ct);
-            client.NoDelay = true;
-            Console.WriteLine($"Input: iPad connected from {client.Client.RemoteEndPoint}");
+            using Socket socket = await source.NextAsync(ct);
+            if (socket.ProtocolType == ProtocolType.Tcp) socket.NoDelay = true;
             try
             {
-                await ReceiveAsync(client.GetStream(), ct);
+                await ReceiveAsync(new NetworkStream(socket), ct);
             }
             catch (Exception e) when (e is IOException or SocketException or EndOfStreamException or OperationCanceledException)
             {

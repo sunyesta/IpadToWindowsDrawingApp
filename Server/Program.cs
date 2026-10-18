@@ -11,25 +11,32 @@ catch (ArgumentException e)
 {
     Console.WriteLine(e.Message);
     Console.WriteLine("Usage: DrawingServer [--encoder libx264|h264_nvenc|h264_qsv|h264_amf] [--bitrate 15] [--fps 60]");
-    Console.WriteLine("                     [--ffmpeg-capture] [--mouse] [--ffmpeg path] [--video-port 9000] [--input-port 9001]");
+    Console.WriteLine("                     [--ffmpeg-capture] [--mouse] [--usb] [--ffmpeg path] [--video-port 9000] [--input-port 9001]");
     return 1;
 }
 
-Console.WriteLine("Drawing server. Enter one of these addresses in the iPad app:");
-foreach (var nic in NetworkInterface.GetAllNetworkInterfaces())
+if (options.Usb)
 {
-    if (nic.OperationalStatus != OperationalStatus.Up || nic.NetworkInterfaceType == NetworkInterfaceType.Loopback) continue;
-    foreach (var addr in nic.GetIPProperties().UnicastAddresses)
-        if (addr.Address.AddressFamily == AddressFamily.InterNetwork)
-            Console.WriteLine($"  {addr.Address,-15}  ({nic.Name})");
+    Console.WriteLine("Drawing server, USB mode. Plug in the iPad, open the app and pick USB.");
+}
+else
+{
+    Console.WriteLine("Drawing server. Enter one of these addresses in the iPad app:");
+    foreach (var nic in NetworkInterface.GetAllNetworkInterfaces())
+    {
+        if (nic.OperationalStatus != OperationalStatus.Up || nic.NetworkInterfaceType == NetworkInterfaceType.Loopback) continue;
+        foreach (var addr in nic.GetIPProperties().UnicastAddresses)
+            if (addr.Address.AddressFamily == AddressFamily.InterNetwork)
+                Console.WriteLine($"  {addr.Address,-15}  ({nic.Name})");
+    }
 }
 
 using var cts = new CancellationTokenSource();
 Console.CancelKeyPress += (_, e) => { e.Cancel = true; cts.Cancel(); };
 
 var injector = new InputInjector(options.MouseMode);
-var input = new InputServer(options, injector).RunAsync(cts.Token);
-var video = new VideoServer(options).RunAsync(cts.Token);
+var input = new InputServer(ConnectionSource.Create(options, "Input", options.InputPort), injector).RunAsync(cts.Token);
+var video = new VideoServer(options, ConnectionSource.Create(options, "Video", options.VideoPort)).RunAsync(cts.Token);
 
 try { await Task.WhenAll(input, video); }
 catch (OperationCanceledException) { }

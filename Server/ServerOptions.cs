@@ -19,6 +19,9 @@ public sealed class ServerOptions
     /// <summary>Inject the Pencil as a plain mouse instead of a Windows Ink pen (no pressure).</summary>
     public bool MouseMode { get; set; }
 
+    /// <summary>Connect to the iPad over the USB cable (through Apple's usbmuxd) instead of waiting for it on Wi-Fi.</summary>
+    public bool Usb { get; set; }
+
     public static ServerOptions Parse(string[] args)
     {
         var o = new ServerOptions();
@@ -35,6 +38,7 @@ public sealed class ServerOptions
                 case "--ffmpeg": o.FfmpegPath = Next(); break;
                 case "--ffmpeg-capture": o.FfmpegCapture = true; break;
                 case "--mouse": o.MouseMode = true; break;
+                case "--usb": o.Usb = true; break;
                 default: throw new ArgumentException($"Unknown option {args[i]}");
             }
         }

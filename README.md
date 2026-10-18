@@ -12,7 +12,7 @@ Client/   SwiftUI iPad app source files: hardware H.264 decode, Pencil + gesture
 
 ## 1. About "connect over Bluetooth"
 
-Bluetooth can't carry this, so the design uses Wi-Fi (or USB later):
+Bluetooth can't carry this, so the design uses Wi-Fi or a USB cable:
 
 | | Bluetooth LE (the only Bluetooth an iPad app can use) | 5 GHz Wi-Fi |
 |---|---|---|
@@ -27,8 +27,9 @@ Apple's MFi hardware program. Even the input channel alone would add 15–30 ms 
 1. **Same 5 GHz / 6 GHz Wi-Fi network** (simplest). Ideally plug the PC into the router with Ethernet.
 2. **Direct link, no router:** Windows Settings → Network & internet → **Mobile hotspot** (needs a
    Wi-Fi adapter in the PC; pick the 5 GHz band). Join it from the iPad; the PC is usually `192.168.137.1`.
-3. **USB-C cable (later upgrade):** tunnel TCP over USB through Apple's `usbmuxd` (the method used by
-   Duet/Astropad). This gives the lowest latency. Only the transport changes; the protocol stays the same.
+3. **USB-C cable (lowest, steadiest latency):** run the server with `--usb` and pick **USB** in the app.
+   The TCP connections are tunneled through Apple's `usbmuxd` (the method used by Duet/Astropad).
+   Only the transport changes; the protocol stays the same. See *Wired mode* below.
 
 ## 2. Recommended protocol
 
@@ -101,7 +102,23 @@ dotnet run -c Release -- --encoder h264_amf    # AMD GPU
 dotnet run -c Release -- --ffmpeg-capture --encoder h264_nvenc   # ffmpeg captures on the GPU and draws the cursor
 ```
 
-Other options: `--bitrate 15` (Mbit/s), `--fps 60`, `--mouse`, `--video-port`, `--input-port`.
+Other options: `--bitrate 15` (Mbit/s), `--fps 60`, `--mouse`, `--usb`, `--video-port`, `--input-port`.
+
+### Wired mode (USB)
+
+```powershell
+dotnet run -c Release -- --usb --ffmpeg-capture --encoder h264_nvenc
+```
+
+1. Install Apple's **Apple Devices** app (Microsoft Store) or **iTunes**. Either one installs
+   *Apple Mobile Device Support*, the USB service the server talks to (`127.0.0.1:27015`).
+2. Plug the iPad into the PC and tap **Trust** on the iPad if it asks.
+3. In the app, pick **USB**. It waits for the PC; the server finds the iPad and connects by itself
+   (it retries every second, so start the server and the app in any order).
+
+Over USB the direction is reversed: the server dials the iPad through `usbmuxd`, and the app listens
+on ports 9000/9001 on its loopback interface only, so nothing on the Wi-Fi network can reach it.
+No firewall rule or IP address is needed.
 
 **On this PC (RTX 3060 Ti) use `--encoder h264_nvenc`.** Measured at 2560×1600 when this was set up:
 the first image reaches a client ~0.5 s after connecting (~0.23 s on reconnect), and each frame
@@ -151,5 +168,4 @@ with Alt+wheel.
   1080p–1440p. For 4K, use `--ffmpeg-capture` with a GPU encoder (it stays on the GPU end to
   end), or move to an in-process Media Foundation encoder.
 - **Discovery:** add Bonjour (`NWBrowser` on iPad, mDNS on Windows) so you don't type IPs.
-- **USB:** replace the TCP endpoint with a usbmuxd tunnel for wired, lowest-latency use.
 - **Resolution change on Windows** ends the session; just tap Connect again.

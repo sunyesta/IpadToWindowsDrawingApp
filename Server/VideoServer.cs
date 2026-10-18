@@ -1,6 +1,5 @@
 using System.Buffers.Binary;
 using System.Diagnostics;
-using System.Net;
 using System.Net.Sockets;
 
 namespace DrawingServer;
@@ -13,25 +12,20 @@ namespace DrawingServer;
 /// ffmpeg, which blocks the capture loop, and Desktop Duplication simply hands us the newest
 /// image next time. Latency stays bounded instead of piling up.
 /// </summary>
-public sealed class VideoServer(ServerOptions options)
+public sealed class VideoServer(ServerOptions options, ConnectionSource source)
 {
     private ScreenCapturer? _capturer;  // lives across sessions, see ScreenCapturer remarks
 
     public async Task RunAsync(CancellationToken ct)
     {
-        var listener = new TcpListener(IPAddress.Any, options.VideoPort);
-        listener.Start();
-        Console.WriteLine($"Video: listening on TCP {options.VideoPort}");
-
         while (!ct.IsCancellationRequested)
         {
-            using TcpClient client = await listener.AcceptTcpClientAsync(ct);
-            client.NoDelay = true;
-            client.SendBufferSize = 256 * 1024;
-            Console.WriteLine($"Video: iPad connected from {client.Client.RemoteEndPoint}");
+            using Socket socket = await source.NextAsync(ct);
+            if (socket.ProtocolType == ProtocolType.Tcp) socket.NoDelay = true;
+            socket.SendBufferSize = 256 * 1024;
             try
             {
-                await StreamToAsync(client.GetStream(), ct);
+                await StreamToAsync(new NetworkStream(socket), ct);
             }
             catch (Exception e) when (!ct.IsCancellationRequested)
             {

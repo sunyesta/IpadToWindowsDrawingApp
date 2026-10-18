@@ -167,7 +167,7 @@ final class RemoteScreenUIView: UIView, UIPencilInteractionDelegate, UIGestureRe
 
     // MARK: - Finger gestures
 
-    func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+    override func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
         penTouch == nil  // no panning/zooming mid-stroke (palm rejection)
     }
 
